@@ -1,10 +1,12 @@
 package com.chaochaowu.facedetect.ui;
 
 import android.annotation.SuppressLint;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.ThumbnailUtils;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Environment;
@@ -49,13 +51,15 @@ import butterknife.OnClick;
 
 /**
  * 主界面
+ *
  * @author chaochaowu
  */
 public class MainActivity extends AppCompatActivity implements MainContract.View {
 
     private static final String TAG = "MainActivity";
     private static final int PERMISSIONS_REQUEST_CODE = 1;
-    private static final int CAMERA_REQUEST_CODE = 2;
+    private static final int REQUEST_CODE_PICK_PHOTO = 2;
+    private static final int CAMERA_REQUEST_CODE = 3;
 
     @BindView(R.id.imageView)
     ImageView imageView;
@@ -63,8 +67,11 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
     ProgressBarCircularIndeterminate progressBar;
     @BindView(R.id.button)
     ButtonRectangle button;
+    @BindView(R.id.photo)
+    ButtonRectangle btnPhoto;
     @BindView(R.id.recyclerView)
     RecyclerView recyclerView;
+    private int headerSize = 255;
 
 
     File mTmpFile;
@@ -76,6 +83,8 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
 
     FacesInfoAdapter mAdapter;
     private List<FaceppBean.FacesBean> faces;
+    private int imgWidth;
+    private int imgHeight;
 
 
     @Override
@@ -90,15 +99,28 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
                 .inject(this);
         faces = new ArrayList<>();
         faces.add(new FaceppBean.FacesBean());
-        mAdapter = new FacesInfoAdapter(this,faces,photo);
+        mAdapter = new FacesInfoAdapter(this, faces, photo);
         mAdapter.setListener(new FacesInfoAdapter.onItemClickListener() {
             @Override
             public void onItemClicked(FaceppBean.FacesBean face, TextView tvBeauty) {
-                gotoDetailActivity(face,tvBeauty);
+                gotoDetailActivity(face, tvBeauty);
             }
         });
-        recyclerView.setLayoutManager(new LinearLayoutManager(this,LinearLayoutManager.HORIZONTAL,false));
+        recyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false));
         recyclerView.setAdapter(mAdapter);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        imageView.post(new Runnable() {
+            @Override
+            public void run() {
+                imgWidth = imageView.getWidth();
+                //height is ready
+                imgHeight = imageView.getHeight();
+            }
+        });
     }
 
     @OnClick(R.id.button)
@@ -106,17 +128,29 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
         takePhoto();
     }
 
-    private void gotoDetailActivity(FaceppBean.FacesBean face,TextView tvBeauty) {
-        if (face.getAttributes() == null){
+    @OnClick(R.id.photo)
+    public void onPhotoClicke() {
+        pickPhoto();
+    }
+
+    protected void pickPhoto() {
+        Intent intentGallery = new Intent(
+                Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI);
+        startActivityForResult(intentGallery, REQUEST_CODE_PICK_PHOTO);
+    }
+
+
+    private void gotoDetailActivity(FaceppBean.FacesBean face, TextView tvBeauty) {
+        if (face.getAttributes() == null) {
             return;
         }
-        Intent intent = new Intent(this,DetailActivity.class);
+        Intent intent = new Intent(this, DetailActivity.class);
         android.support.v4.util.Pair<View, String> image = new android.support.v4.util.Pair(imageView, "image");
         android.support.v4.util.Pair<View, String> beauty = new android.support.v4.util.Pair(tvBeauty, "beauty");
         ActivityOptionsCompat optionsCompat =
-                ActivityOptionsCompat.makeSceneTransitionAnimation(this, image,beauty);
-        EventBus.getDefault().postSticky(new FaceEvent(photo,face));
-        startActivity(intent,optionsCompat.toBundle());
+                ActivityOptionsCompat.makeSceneTransitionAnimation(this, image, beauty);
+        EventBus.getDefault().postSticky(new FaceEvent(photo, face));
+        startActivity(intent, optionsCompat.toBundle());
     }
 
     @Override
@@ -143,16 +177,67 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
                     options.inSampleSize = 2;
                     photo = BitmapFactory.decodeFile(mTmpFile.getAbsolutePath(), options);
                     int bitmapDegree = Utils.getBitmapDegree(mTmpFile.getAbsolutePath());
-                    if(bitmapDegree != 0){
+                    if (bitmapDegree != 0) {
                         photo = Utils.rotateBitmapByDegree(this.photo, bitmapDegree);
                     }
                     displayPhoto(this.photo);
                     mAdapter.setPhoto(this.photo);
                     mPresenter.getDetectResultFromServer(this.photo);
                     break;
+                case REQUEST_CODE_PICK_PHOTO:
+                    doPhoto(data);
+                    break;
                 default:
                     break;
             }
+        }
+    }
+
+
+    private void doPhoto(Intent data) {
+        try {
+            Uri uri = data.getData();
+            if (uri == null) {
+                Bundle bundle = data.getExtras();
+                if (bundle != null) {
+                    Bitmap photo = (Bitmap) bundle.get("data");
+                    // LogUtil.d("图片压缩前：" + getSize(photo) + "K 宽：" +
+                    // photo.getWidth() + " 高：" + photo.getHeight());
+                    int headWidth = photo.getWidth();
+                    int headHeight = photo.getHeight();
+                    if (photo.getWidth() > imgWidth) {
+                        headWidth = imgWidth;
+                    }
+                    if (photo.getHeight() > imgHeight) {
+                        headHeight = imgHeight;
+                    }
+                    photo = ThumbnailUtils.extractThumbnail(photo, headWidth, headHeight);
+                    displayPhoto(photo);
+                    mAdapter.setPhoto(photo);
+                    mPresenter.getDetectResultFromServer(photo);
+                    return;
+                }
+            } else {
+                ContentResolver cr = getContentResolver();
+                if (cr != null) {
+                    Bitmap bitmap = BitmapFactory.decodeStream(cr.openInputStream(uri));
+                    int headWidth = bitmap.getWidth();
+                    int headHeight = bitmap.getHeight();
+                    if (headWidth > imageView.getWidth()) {
+                        headWidth = imageView.getWidth();
+                    }
+                    if (headHeight > imageView.getHeight()) {
+                        headHeight = imageView.getHeight();
+                    }
+                    bitmap = ThumbnailUtils.extractThumbnail(bitmap, headWidth, headHeight);
+                    displayPhoto(bitmap);
+                    mAdapter.setPhoto(bitmap);
+                    mPresenter.getDetectResultFromServer(bitmap);
+                    return;
+                }
+            }
+        } catch (Exception ex) {
+            Log.e("TAG", "选择图片失败");
         }
     }
 
@@ -195,8 +280,8 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
         this.faces.clear();
         if (faces == null) {
             this.faces.add(new FaceppBean.FacesBean());
-            Toast.makeText(this,"未检测到面部信息",Toast.LENGTH_LONG).show();
-        }else {
+            Toast.makeText(this, "未检测到面部信息", Toast.LENGTH_LONG).show();
+        } else {
             this.faces.addAll(faces);
         }
         mAdapter.notifyDataSetChanged();
