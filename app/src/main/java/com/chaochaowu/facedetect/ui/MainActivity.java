@@ -220,16 +220,22 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             } else {
                 ContentResolver cr = getContentResolver();
                 if (cr != null) {
-                    photo = BitmapFactory.decodeStream(cr.openInputStream(uri));
-                    int headWidth = photo.getWidth();
-                    int headHeight = photo.getHeight();
-                    if (headWidth > imageView.getWidth()) {
-                        headWidth = imageView.getWidth();
+                    BitmapFactory.Options options = new BitmapFactory.Options();
+                    options.inSampleSize = 2;
+                    photo = BitmapFactory.decodeStream(cr.openInputStream(uri), null, options);
+                    int bitmapDegree = Utils.getBitmapDegree(uri.getPath());
+                    if (bitmapDegree != 0) {
+                        photo = Utils.rotateBitmapByDegree(photo, bitmapDegree);
                     }
-                    if (headHeight > imageView.getHeight()) {
-                        headHeight = imageView.getHeight();
-                    }
-                    photo = ThumbnailUtils.extractThumbnail(photo, headWidth, headHeight);
+//                    int headWidth = photo.getWidth();
+//                    int headHeight = photo.getHeight();
+//                    if (headWidth > imageView.getWidth()) {
+//                        headWidth = imageView.getWidth();
+//                    }
+//                    if (headHeight > imageView.getHeight()) {
+//                        headHeight = imageView.getHeight();
+//                    }
+//                    photo = ThumbnailUtils.extractThumbnail(photo, headWidth, headHeight);
                     displayPhoto(photo);
                     mAdapter.setPhoto(photo);
                     mPresenter.getDetectResultFromServer(photo);
