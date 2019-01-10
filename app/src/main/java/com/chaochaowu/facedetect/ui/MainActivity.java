@@ -200,7 +200,7 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             if (uri == null) {
                 Bundle bundle = data.getExtras();
                 if (bundle != null) {
-                    Bitmap photo = (Bitmap) bundle.get("data");
+                    photo = (Bitmap) bundle.get("data");
                     // LogUtil.d("图片压缩前：" + getSize(photo) + "K 宽：" +
                     // photo.getWidth() + " 高：" + photo.getHeight());
                     int headWidth = photo.getWidth();
@@ -220,19 +220,19 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
             } else {
                 ContentResolver cr = getContentResolver();
                 if (cr != null) {
-                    Bitmap bitmap = BitmapFactory.decodeStream(cr.openInputStream(uri));
-                    int headWidth = bitmap.getWidth();
-                    int headHeight = bitmap.getHeight();
+                    photo = BitmapFactory.decodeStream(cr.openInputStream(uri));
+                    int headWidth = photo.getWidth();
+                    int headHeight = photo.getHeight();
                     if (headWidth > imageView.getWidth()) {
                         headWidth = imageView.getWidth();
                     }
                     if (headHeight > imageView.getHeight()) {
                         headHeight = imageView.getHeight();
                     }
-                    bitmap = ThumbnailUtils.extractThumbnail(bitmap, headWidth, headHeight);
-                    displayPhoto(bitmap);
-                    mAdapter.setPhoto(bitmap);
-                    mPresenter.getDetectResultFromServer(bitmap);
+                    photo = ThumbnailUtils.extractThumbnail(photo, headWidth, headHeight);
+                    displayPhoto(photo);
+                    mAdapter.setPhoto(photo);
+                    mPresenter.getDetectResultFromServer(photo);
                     return;
                 }
             }
@@ -290,12 +290,14 @@ public class MainActivity extends AppCompatActivity implements MainContract.View
     @Override
     public void showProgress() {
         button.setVisibility(View.INVISIBLE);
+        btnPhoto.setVisibility(View.INVISIBLE);
         progressBar.setVisibility(View.VISIBLE);
     }
 
     @Override
     public void hideProgress() {
         button.setVisibility(View.VISIBLE);
+        btnPhoto.setVisibility(View.VISIBLE);
         progressBar.setVisibility(View.GONE);
     }
 
